@@ -1,0 +1,686 @@
+---
+title: "County Level Demographics & Locations of Rural Health Care Centers in Illinois"
+author: "Stacie Elliott, Jorge Esparza Hernandez, Cali Goulet, & Suley Rahameto"
+text.align: "center"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{=html}
+<style type="text/css">
+
+h1.title {
+  text-align: center;
+}
+h4.author { /* Header 4 - and the author and data headers use this too  */
+  text-align: center;
+}
+</style>
+```
+```{r, include = FALSE}
+library(ggmap)
+library(gstat)
+library(raster)
+library(sf)
+library(sp)
+library(tidycensus)
+library(tidygeocoder)
+library(tidyverse)
+library(tmap)
+library(viridis)
+```
+
+```{r, include = FALSE}
+rural <- read_csv("~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/rural_final.csv")
+
+
+rural_income <- st_read("~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/joined_shps/rural_income.shp")
+
+rural_education <- st_read("~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/joined_shps/rural_education.shp")
+
+rural_insurance <- st_read("~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/joined_shps/rural_insurance.shp")
+
+rural_med_income <- st_read("~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/joined_shps/rural_med_income.shp")
+
+rural_pop <- st_read("~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/joined_shps/rural_pop.shp")
+
+
+income <- st_read("~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/acs_shps/il_income/il_income.shp")
+
+education <- st_read("~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/acs_shps/il_education/il_education.shp")
+
+insurance <- st_read("~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/acs_shps/il_insurance/il_insurance.shp")
+
+med_income <- st_read("~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/acs_shps/il_med_income/il_med_income.shp")
+
+pop <- st_read("~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/acs_shps/il_pop/il_pop.shp")
+```
+
+```{r, include = FALSE}
+rural.sf <- st_as_sf(rural, coords = c("longitude", "latitude"))
+rural.sf <- st_set_crs(rural.sf, crs(income))
+```
+
+## Rural Health Care Centers in Illinois
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+tmap_mode("view")
+tm_basemap("OpenStreetMap.HOT") +
+  tm_shape(pop) +
+  tm_borders() +
+  tm_shape(rural.sf) + 
+  tm_dots("Rural Health Clinics", palette = "black", legend.show = FALSE) +
+  tm_layout(legend.outside = TRUE)
+```
+
+Research Question: Are the locations of rural healthcare providers in Illinois significantly correlated with various demographic variables?
+
+## Population by County
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+tm_basemap("OpenStreetMap.HOT") +
+  tm_shape(pop) +
+  tm_polygons("population", title = "Population", palette = "YlGn", n = 10, breaks = c(0, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, Inf)) +
+  tm_shape(rural.sf) + 
+  tm_dots("Rural Health Clinics", palette = "black", legend.show = FALSE) +
+  tm_layout(legend.outside = TRUE)
+```
+
+    The health care centers are located largely in counties with fairly low populations, which makes sense given the data is on rural health care centers. Champaign, IL is an exception to this since there is a health care center in the county despite having a population of over 200,000. Even so, this is likely explained by the presence of the University of Illinois at Urbana - Champaign considering this large college town is most likely responsible for a large portion of the county population. In other words, Champaign could be a mostly rural county, but that rurality is skewed by the population of Urbana.
+
+## Percent with Income Under \$25,000 by County
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+income1 <- income %>%
+  mutate(income = case_when(income == "Less than $10,000" ~ "Under $25,000",
+                            income == "$10,000 to $14,999" ~ "Under $25,000",
+                            income == "$15,000 to $19,999" ~ "Under $25,000",
+                            income == "$20,000 to $24,999" ~ "Under $25,000",
+                            income == "$25,000 to $29,999" ~ "Over $25,000",
+                            income == "$30,000 to $34,999" ~ "Over $25,000",
+                            income == "$35,000 to $39,999" ~ "Over $25,000",
+                            income == "$40,000 to $44,999" ~ "Over $25,000",
+                            income == "$45,000 to $49,999" ~ "Over $25,000",
+                            income == "$50,000 to $59,999" ~ "Over $25,000",
+                            income == "$60,000 to $74,999" ~ "Over $25,000",
+                            income == "$75,000 to $99,999" ~ "Over $25,000",
+                            income == "$100,000 to $124,999" ~ "Over $25,000",
+                            income == "$125,000 to $149,999" ~ "Over $25,000",
+                            income == "$150,000 to $199,999" ~ "Over $25,000",
+                            income == "$200,000 or more" ~ "Over $25,000"),
+         percent = n / total,
+         percent = percent * 100)
+
+income2 <- income1 %>%
+  filter(income == "Under $25,000")
+
+tm_basemap("OpenStreetMap.HOT") +
+  tm_shape(income2) +
+  tm_polygons("percent", title = "Percent", palette = "YlGn", breaks = c(0, 2, 4, 6, 8, 10, Inf)) +
+  tm_shape(rural.sf) + 
+  tm_dots("Rural Health Clinics", palette = "black", legend.show = FALSE) +
+  tm_layout(legend.outside = TRUE)
+```
+
+    This plot shows the percentage of households with incomes lower than $25,000 per year, which is roughly the poverty line for a family of four. Though the rates seem fairly consistent across the state, there does appear to be some clustering. For example, the northeastern corner of the state, which contains Chicago, has some of the lowest rates whereas pockets of western and southern Illinois have a higher percentage of households earning less than $25,000 per year.
+
+## Median Income by County
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+tm_basemap("OpenStreetMap.HOT") +
+  tm_shape(med_income) +
+  tm_polygons("med_income", title = "Median Income", palette = "YlGn", breaks = c(-Inf, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000, Inf)) +
+  tm_shape(rural.sf) + 
+  tm_dots("Rural Health Clinics", palette = "black", legend.show = FALSE) +
+  tm_layout(legend.outside = TRUE)
+```
+
+    The counties that are further south tend to have lower median incomes, and the counties in the northeast section of the state, areas around Chicago, tend to have higher median incomes. These patterns are very similar to those in the previous plot.
+
+## Percent Without High School Diploma/GED by County
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+education1 <- education %>%
+  mutate(highest_degree = case_when(education == "Lower than 8th Grade" ~ "No Degree",
+                                    education == "8th Grade" ~ "No Degree",
+                                    education == "Some High School" ~ "No Degree",
+                                    education == "High School, No Diploma" ~ "No Degree",
+                                    education == "High School Diploma" ~ "High School/GED",
+                                    education == "GED or Alternative" ~ "High School/GED",
+                                    education == "Some College" ~ "High School/GED",
+                                    education == "Associate's Degree" ~ "College",
+                                    education == "Bachelor's Degree" ~ "College",
+                                    education == "Master's Degree" ~ "College",
+                                    education == "Professional School Degree" ~ "College",
+                                    education == "Doctorate Degree" ~ "College"),
+         percent = n / total,
+         percent = percent * 100) %>%
+  dplyr::select(-education) 
+
+education2 <- education1 %>%
+  filter(highest_degree == "No Degree")
+
+tm_basemap("OpenStreetMap.HOT") +
+  tm_shape(education2) +
+  tm_polygons("percent", title = "Percent", palette = "YlGn", breaks = c(0, 2, 4, 6, 8, 10, 12, Inf)) +
+  tm_shape(rural.sf) + 
+  tm_dots("Rural Health Clinics", palette = "black", legend.show = FALSE) +
+  tm_layout(legend.outside = TRUE)
+```
+
+    Only considering people at least 25 years of age, counties in southern Illinois tend to have higher percentages of people that didn't graduate high school or earn a GED. 
+
+## Percent Insured by County
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+insurance1 <- insurance %>%
+  filter(insrnc_ == "yes") %>%
+  mutate(percent = percent * 100)
+
+tm_basemap("OpenStreetMap.HOT") +
+  tm_shape(insurance1) +
+  tm_polygons("percent", title = "Percent", palette = "YlGn", breaks = c(-Inf, 10, 12, 14, 16, 18, 20, Inf)) +
+  tm_shape(rural.sf) + 
+  tm_dots("Rural Health Clinics", palette = "black", legend.show = FALSE) +
+  tm_layout(legend.outside = TRUE)
+```
+
+    Health insurance coverage seems to be fairly consistent across Illinois counties, except for Hamilton, IL which appears to have the lowest overall rate of health insurance coverage, though it is only lower by a few percentage points.
+
+# Regression Tables
+
+![](regressionTables/Table1Insurance.png)
+
+Table 1: The percent of people who currently have health insurance does not affect the density of health care centers in a county.
+
+![](regressionTables/Table2New.png)
+
+Table 2. The percent of people who have completed 8th grade as their highest level of education does not affect the density of health care centers in a county.
+
+![](regressionTables/table3Population.png)
+
+Table 3. For each additional 1 unit increase in log(population), the expected number of health care centers in a particular county increases by 25.3% (or 1.253 times). This is statistically significant (p \< 0.001)
+
+![](regressionTables/Table4Final.png)
+
+Table 4. For each additional 1 unit increase in Median Income the expected number of health care centers in a particular county decreases by 0.00266% (or decreases 0.99997 times). This is statistically significant (p \< 0.01)
+
+# Conclusion
+
+**Are the locations of rural healthcare providers in Illinois significantly correlated with various demographic variables?**
+
+**Yes!** Population and median income are significantly correlated with the density of healthcare providers in rural areas. While population and median income seem to be strong predictors of a healthcare provider in rural areas, we do not see a causal relationship between these variables and the location of health care providers.
+
+This study shows the continued importance of healthcare in rural areas. We assert that *healthcare is a human right* and we should be more aware of the factors surrounding geographical access and proximity to healthcare providers.
+
+**Limitations**: Due to the nature of our data, we cannot make more than broad statements about information at the county level. For example, some rural healthcare centers are in counties with vastly different industries in the same county (i.e. Champaign County).
+
+**Recommendation for Further Research**: We would recommend a study of the specific communities where rural healthcare centers are located to avoid fallacies like the ecological fallacy. We would also recommend a more in-depth analysis of the context surrounding the placement and construction of rural healthcare centers.
+
+# Index
+
+## Census Data
+
+### Importing Data
+
+The American Community Survey (shortened to ACS throughout our work) is a monthly survey conducted by the US Census Bureau to gather typical census information on a more regular basis. We retrieved data from 2019, as it was the most up to date information available, which is [here](https://www.socialexplorer.com/data/ACS2019/metadata/?ds=ACS19).
+
+```{r eval=FALSE, include=FALSE}
+census_api_key("1be3b841a45bc8a7761e730b32656fac276b3368", overwrite = TRUE, install = TRUE)
+
+il_pop <- get_acs("county",
+                    table = "B01003",
+                    year = 2019,    
+                    output = "tidy", 
+                    state = "IL",   
+                    geometry = TRUE,   
+                    cache_table = TRUE)
+
+il_income <- get_acs("county",
+                    table = "B19001",
+                    year = 2019,    
+                    output = "wide", 
+                    state = "IL",   
+                    geometry = TRUE,   
+                    cache_table = TRUE)
+
+il_med_income <- get_acs("county",
+                    table = "B19013",
+                    year = 2019,    
+                    output = "tidy", 
+                    state = "IL",   
+                    geometry = TRUE,   
+                    cache_table = TRUE)
+
+il_insurance <- get_acs("county",
+                    table = "B992701",
+                    year = 2019,    
+                    output = "wide", 
+                    state = "IL",   
+                    geometry = TRUE,   
+                    cache_table = TRUE)
+
+il_education <- get_acs("county",
+                    table = "B15003",
+                    year = 2019,    
+                    output = "wide", 
+                    state = "IL",   
+                    geometry = TRUE,   
+                    cache_table = TRUE)
+```
+
+### Data Wrangling
+
+This chunk represents most of our data wrangling and cleaning. Much of this work is re-coding variables to accurately reflect their meanings (i.e. changing "B15003_016E" to "High School, No Diploma" in our education variable).
+
+```{r, Cleaning, eval = FALSE}
+il_pop <- il_pop %>%
+  rename(population = estimate,
+         county = NAME) %>%
+  mutate(county = str_remove(county, "County, Illinois")) %>%
+  dplyr::select(-c(moe, variable, GEOID))
+
+il_med_income <- il_med_income %>%
+  rename(med_income = estimate,
+         county = NAME) %>%
+  mutate(county = str_remove(county, "County, Illinois")) %>%
+  dplyr::select(-c(variable, GEOID, moe))
+
+il_insurance <- il_insurance %>%
+  rename(county = NAME,
+         total = B992701_001E) %>%
+  pivot_longer(cols = c(4:5), names_to = "insurance_coverage", values_to = "n") %>%
+  mutate(insurance_coverage = ifelse(insurance_coverage == "B992701_002E", "yes", "no"),
+         county = str_remove(county, "County, Illinois"),
+         percent = n / total) %>%
+  dplyr::select(-GEOID)
+
+il_income <- il_income %>% 
+  rename(county = NAME,
+         total = B19001_001E) %>%
+  dplyr::select(-c(GEOID, B19001_001M, B19001_002M, B19001_003M, B19001_004M, B19001_005M, B19001_006M, B19001_007M, B19001_008M, B19001_009M, B19001_010M, B19001_011M, B19001_012M, B19001_013M, B19001_014M, B19001_015M, B19001_016M, B19001_017M)) %>%
+  pivot_longer(cols = c(3:18), names_to = "income", values_to = "n") %>%
+  mutate(county = str_remove(county, "County, Illinois"),
+         income = case_when(income == "B19001_002E" ~ "Less than $10,000",
+                      income == "B19001_003E" ~ "$10,000 to $14,999",
+                      income == "B19001_004E" ~ "$15,000 to $19,999",
+                      income == "B19001_005E" ~ "$20,000 to $24,999",
+                      income == "B19001_006E" ~ "$25,000 to $29,999",
+                      income == "B19001_007E" ~ "$30,000 to $34,999",
+                      income == "B19001_008E" ~ "$35,000 to $39,999",
+                      income == "B19001_009E" ~ "$40,000 to $44,999",
+                      income == "B19001_010E" ~ "$45,000 to $49,999",
+                      income == "B19001_011E" ~ "$50,000 to $59,999",
+                      income == "B19001_012E" ~ "$60,000 to $74,999",
+                      income == "B19001_013E" ~ "$75,000 to $99,999",
+                      income == "B19001_014E" ~ "$100,000 to $124,999",
+                      income == "B19001_015E" ~ "$125,000 to $149,999",
+                      income == "B19001_016E" ~ "$150,000 to $199,999", 
+                      income == "B19001_017E" ~ "$200,000 or more"))  
+il_education <- il_education %>%
+  rename(county = NAME,
+         total = B15003_001E) %>%
+  dplyr::select(-c(GEOID, B15003_001M, B15003_002M, B15003_003M, B15003_004M, B15003_005M, B15003_006M, B15003_007M, B15003_008M, B15003_009M, B15003_010M, B15003_011M, B15003_012M, B15003_013M, B15003_014M, B15003_015M, B15003_016M, B15003_017M, B15003_018M, B15003_019M, B15003_020M, B15003_021M, B15003_022M, B15003_023M, B15003_024M, B15003_025M)) %>%
+  mutate(lower = B15003_002E + B15003_003E + B15003_004E + B15003_005E + B15003_006E + B15003_007E + B15003_008E + B15003_009E + B15003_010E + B15003_011E,
+         some_high = B15003_013E + B15003_014E + B15003_015E,
+         some_college = B15003_019E + B15003_020E) %>%
+  dplyr::select(-c(3:12, 14:16, 20:21)) %>%
+  pivot_longer(cols = c(3:14), names_to = "education", values_to = "n") %>%
+  mutate(county = str_remove(county, "County, Illinois"),
+         education = case_when(education == "lower" ~ "Lower than 8th Grade",
+                      education == "B15003_012E" ~ "8th Grade",
+                      education == "some_high" ~ "Some High School", 
+                      education == "B15003_016E" ~ "High School, No Diploma", 
+                      education == "B15003_017E" ~ "High School Diploma", 
+                      education == "B15003_018E" ~ "GED or Alternative", 
+                      education == "some_college" ~ "Some College", 
+                      education == "B15003_021E" ~ "Associate's Degree", 
+                      education == "B15003_022E" ~ "Bachelor's Degree", 
+                      education == "B15003_023E" ~ "Master's Degree", 
+                      education == "B15003_024E" ~ "Professional School Degree",
+                      education == "B15003_025E" ~ "Doctorate Degree"))
+
+```
+
+### Writing Data
+
+```{r, eval = FALSE}
+st_write(il_education,"~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/acs_shps/il_education/il_education.shp")
+
+st_write(il_pop,"~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/acs_shps/il_pop/il_pop.shp")
+
+st_write(il_insurance,"~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/acs_shps/il_insurance/il_insurance.shp")
+
+st_write(il_med_income,"~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/acs_shps/il_med_income/il_med_income.shp")
+
+st_write(il_income,"~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/acs_shps/il_income/il_income.shp")
+```
+
+## Joining Data Sets
+
+### Converting to a Shape file
+
+```{r, eval = FALSE}
+rural_final.sf <- st_as_sf(rural_final, coords = c("longitude", "latitude"))
+rural_final.sf <- st_set_crs(rural_final.sf, crs(il_income))
+```
+
+### Writing Data
+
+```{r, warning = FALSE, eval = FALSE}
+rural_income <- st_join(rural_final.sf, il_income, join = st_within)
+st_write(rural_income,"~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/joined_shps/rural_income.shp")
+
+rural_education <- st_join(rural_final.sf, il_education, join = st_within)
+st_write(rural_education,"~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/joined_shps/rural_education.shp")
+
+rural_insurance <- st_join(rural_final.sf, il_insurance, join = st_within)
+st_write(rural_insurance,"~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/joined_shps/rural_insurance.shp")
+
+rural_med_income <- st_join(rural_final.sf, il_med_income, join = st_within)
+st_write(rural_med_income,"~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/joined_shps/rural_med_income.shp")
+
+rural_pop <- st_join(rural_final.sf, il_pop, join = st_within)
+st_write(rural_pop,"~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/joined_shps/rural_pop.shp")
+```
+
+## Library
+
+```{r}
+library(ggmap)
+library(gstat)
+library(raster)
+library(sf)
+library(sp)
+library(tidycensus)
+library(tidygeocoder)
+library(tidyverse)
+library(tmap)
+library(spdep)
+```
+
+## Regressions
+
+### County Level Geometries
+
+In order to define neighbors and create weights to check for the presence of systematic spatial variation and positive spatial autocorrelation, we had to merge our ACS data with an outside source which included the geometries for the counties in Illinois.
+
+```{r County Level Geometries for Regressions, echo = T, results = 'hide'}
+##read in data
+covid <- st_read("~/Stat_282_Spatial_Data/data/covid/covid.shp")
+
+
+##clean county level geometries
+il_countygeom <- covid %>% 
+  filter(State == "Illinois") %>% 
+  subset(select = -c(pop2019, fips, vax_fll, cases, cs__100, prcnt_v)) %>%
+  separate(County, sep = -7, into = "County")
+```
+
+### ACS Regression Set Up
+
+This chunk of code creates the datasets necessary for finding Moran's i along with creating basic linear regressions.
+
+```{r echo = T, results = 'hide'}
+##Median Income
+il_medInc.sf <- st_read("~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/joined_shps/rural_med_income.shp")
+
+il_medInc1.sf <- st_join(il_countygeom, il_medInc.sf, left = TRUE)
+il_medInc1.sf <- il_medInc1.sf %>%
+  na.omit()
+medInc1.sf <- il_medInc1.sf %>%
+  distinct(county_1, .keep_all = TRUE)
+
+medInc1.nb <- poly2nb(medInc1.sf, queen = TRUE) 
+medInc1.nbw <- nb2listw(medInc1.nb, style = "W", zero.policy = TRUE)
+
+medInc.lm <- lm(n_conty ~ med_ncm, data=medInc1.sf)
+
+medInc1.moranI <- moran(medInc.lm$residuals, 
+                       medInc1.nbw, 
+                       n = length(medInc1.nb), 
+                       S0 = Szero(medInc1.nbw), 
+                       zero.policy = TRUE)
+
+
+##Insurance 
+
+il_insurance.sf <- st_read("~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/joined_shps/rural_insurance.shp")
+
+insurance.sf <- st_join(il_countygeom, il_insurance.sf, left = TRUE)
+insurance.sf <- insurance.sf %>%
+  na.omit()
+
+insurance.sf <- insurance.sf %>% 
+  filter(insrnc_ == "yes") %>% 
+  distinct(County.y, .keep_all = TRUE)
+
+insurance.lm <- lm(n_conty ~ percent, data = insurance.sf)
+
+insurance.nb <- poly2nb(insurance.sf, queen = TRUE) 
+insurance.nbw <- nb2listw(insurance.nb, style = "W", zero.policy = TRUE)
+
+insurance.moranI <- moran(insurance.lm$residuals, 
+                       insurance.nbw, 
+                       n = length(insurance.nb), 
+                       S0 = Szero(insurance.nbw), 
+                       zero.policy = TRUE)
+
+##Population Set Up
+
+il_pop.sf <- st_read("~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/joined_shps/rural_pop.shp")
+
+population.sf <- st_join(il_countygeom, il_pop.sf, left = TRUE)
+population.sf <- population.sf %>%
+  na.omit() 
+population.sf <- population.sf %>% 
+  distinct(County.y, .keep_all = TRUE)
+
+
+pop.lm <- lm(n_conty ~ log(popultn), data = population.sf)
+
+pop.nb <- poly2nb(population.sf, queen = TRUE) 
+pop.nbw <- nb2listw(pop.nb, style = "W", zero.policy = TRUE)
+
+pop.moranI <- moran(pop.lm$residuals, 
+                       pop.nbw, 
+                       n = length(pop.nb), 
+                       S0 = Szero(pop.nbw), 
+                       zero.policy = TRUE)
+
+##Education Set Up 
+education <- st_read("~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/joined_shps/rural_education.shp")
+
+education <- education %>%
+  mutate(highest_degree = case_when(educatn == "Lower than 8th Grade" ~ "No Degree",
+                                    educatn == "8th Grade" ~ "No Degree",
+                                    educatn == "Some High School" ~ "No Degree",
+                                    educatn == "High School, No Diploma" ~ "No Degree",
+                                    educatn == "High School Diploma" ~ "High School/GED",
+                                    educatn == "GED or Alternative" ~ "High School/GED",
+                                    educatn == "Some College" ~ "High School/GED",
+                                    educatn == "Associate's Degree" ~ "College",
+                                    educatn == "Bachelor's Degree" ~ "College",
+                                    educatn == "Master's Degree" ~ "College",
+                                    educatn == "Professional School Degree" ~ "College",
+                                    educatn == "Doctorate Degree" ~ "College"),
+         percent = n / total,
+         percent = percent * 100) 
+
+education.sf <- st_join(il_countygeom, education, left = TRUE)
+education.sf <- education.sf %>%
+  na.omit() 
+education.sf <- education.sf %>% 
+  distinct(County.y, .keep_all = TRUE) %>%
+  filter(educatn == "8th Grade")
+
+education.lm <- lm(n_conty ~ percent, data = education.sf)
+
+edu.nb <- poly2nb(education.sf, queen = TRUE) 
+edu.nbw <- nb2listw(edu.nb, style = "W", zero.policy = TRUE)
+
+edu.moranI <- moran(education.lm$residuals, 
+                       edu.nbw, 
+                       n = length(edu.nb), 
+                       S0 = Szero(edu.nbw), 
+                       zero.policy = TRUE)
+```
+
+### Moran's I
+
+All of the values of Moran's i are insignificant (close to 0). This tells us that our data is not spatially correlated and that we don't have to consider it within our regression models.
+
+#### Median Income
+
+```{r}
+medInc1.moranI$I
+```
+
+#### Insurance
+
+```{r}
+insurance.moranI$I
+```
+
+#### Population
+
+```{r}
+pop.moranI$I
+```
+
+#### Education
+
+```{r}
+edu.moranI$I
+```
+
+### Poisson Regression Assumptions
+
+Here we check the assumptions in order to use a Poisson Regression instead of the linear model. Through the histograms we can see that the response variable, the number of health care centers in a particular county, is made up of right skewed counts. The mean and variance of the response variable are not exactly equal but the difference isn't egregious. We can also see that a slight curvature of relationship of Y and X, indicates log relationship would work.
+
+#### Median Income
+
+```{r}
+ggplot(data = medInc1.sf, aes(x = n_conty)) + 
+  geom_histogram() + 
+  labs(title = "Distribution of Number of Health Care Centers", x = "# of Health Care Centers")
+
+ggplot(data = medInc1.sf, aes(x = med_ncm)) + 
+  geom_histogram() + 
+  labs(title = "Distribution of Number of Median Income", x = "Median Income ($)")
+
+ggplot(data = medInc1.sf, aes(x = med_ncm, y = n_conty)) + 
+  geom_point() + 
+  geom_smooth() + 
+  labs(title = "Number of Centers by Median Income", y = "# of Health Care Centers", x = "Median Income ($)")
+
+mean(medInc1.sf$n_conty)
+var(medInc1.sf$n_conty)
+```
+
+#### Insurance
+
+```{r}
+
+ggplot(data = insurance.sf, aes(x = n_conty)) + 
+  geom_histogram() + 
+  labs(title = "Distribution of Number of Health Care Centers", x = "# of Health Care Centers")
+
+ggplot(data = insurance.sf, aes(x = percent)) + 
+  geom_histogram() + 
+  labs(title = "Distribution of Percent Insured", x = "% Insured")
+
+ggplot(data = insurance.sf, aes(x = percent, y = n_conty)) + 
+  geom_point() + 
+  geom_smooth() + 
+  labs(title = "Number of Centers by % Insured", y = "# of Health Care Centers", x = "% Insured")
+
+```
+
+#### Population
+
+```{r}
+ggplot(data = population.sf, aes(x = n_conty)) + 
+  geom_histogram() + 
+  labs(title = "Distribution of Number of Health Care Centers", x = "# of Health Care Centers")
+
+ggplot(data = population.sf, aes(x = popultn)) + 
+  geom_histogram() + 
+  labs(title = "Distribution of Population", x = "Total Population (by county)")
+
+ggplot(data = population.sf, aes(x = log(popultn))) + 
+  geom_histogram() + 
+  labs(title = "Distribution of Logged Population", x = "Total Population (by county)")
+
+
+ggplot(data = population.sf, aes(x = log(popultn), y = n_conty)) + 
+  geom_point() + 
+  geom_smooth() + 
+  labs(title = "Number of Centers by Total Population", y = "# of Health Care Centers", x = "log of Total Population (in county)")
+```
+
+#### Education
+
+```{r}
+ggplot(data = education.sf, aes(x = n_conty)) + 
+  geom_histogram() + 
+  labs(title = "Distribution of Number of Health Care Centers", x = "# of Health Care Centers")
+
+ggplot(data = education.sf, aes(x = percent)) + 
+  geom_histogram() + 
+  labs(title = "Distribution of Percent Completion of High School", x = "8th Grade as Highest Level Of Schooling (% of pop))")
+
+
+ggplot(data = education.sf, aes(x = percent, y = n_conty)) + 
+  geom_point() + 
+  geom_smooth() + 
+  labs(title = "Number of Centers by Completion of High School (% of pop)", y = "# of Health Care Centers", x = "8th Grade as Highest Level of Schooling (% of pop)")
+```
+
+## 
+
+## Rural Healthcare Data
+
+This data was imported from the Illinois Department of Public Health website, available [here](https://data.illinois.gov/dataset/442idph_rural_health_center_directory/resource/bf805ea2-347c-4985-b648-71889043ebd5). This data was last updated on August 24th, 2021.
+
+### Importing
+
+```{r eval=FALSE}
+addresses <- read_csv("~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/addresses.csv")
+
+rural_health <- read_csv("~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/rural-health-clinic-aug-2021.csv")
+```
+
+### Geocoding
+
+```{r, eval=FALSE}
+#Using tidygeocoder to create latitude and longitude coordinates for each health care center 
+lat_longs <- addresses %>%
+  mutate(State2 = "IL") %>%
+  unite(StateZip, c(State2, Zip), sep = " ") %>%
+  unite(addr, c(Address, City, StateZip), sep = ", ") %>%
+   geocode(addr, method = 'arcgis', lat = latitude , long = longitude)
+
+rural_health_united <- rural_health %>%
+  mutate(State2 = "IL") %>%
+  unite(StateZip, c(State2, Zip), sep = " ") %>%
+  unite(addr, c(Address, City, StateZip), sep = ", ")
+
+rural_joined <- full_join(lat_longs, rural_health_united, by = "addr")
+
+rural <- rural_joined %>%
+  mutate(County = ifelse(County == 0, "La Salle", County))
+
+rural_n <- rural %>%
+  group_by(County) %>%
+  summarise(n_county = n())
+
+rural_final <- left_join(rural, rural_n, key = "County")
+```
+
+### Writing Data
+
+```{r, eval=FALSE}
+write.csv(rural_final,"~/Stat_282_Spatial_Data/student/Cali, Jorge, Stacie, Suley Project/rural_final.csv")
+```
